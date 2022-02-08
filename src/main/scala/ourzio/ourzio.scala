@@ -64,6 +64,22 @@ object ZIO:
     r => Right(run(r))
   }
 
+  inline def environment[R]: ZIO[R, Nothing, R] = ZIO.identity
+
+  def identity[R]: ZIO[R, Nothing, R] = ZIO.fromFunction(Predef.identity)
+
+  def access[R]: AccessPartiallyApplied[R] = AccessPartiallyApplied()
+
+  def accessM[R]: AccessMPartiallyApplied[R] = AccessMPartiallyApplied()
+
+final class AccessPartiallyApplied[R]():
+  def apply[A](r: R => A): ZIO[R, Nothing, A] =
+    ZIO.environment[R].map(r)
+
+final case class AccessMPartiallyApplied[R]():
+  def apply[E, A](r: R => ZIO[R, E, A]): ZIO[R, E, A] =
+    ZIO.environment[R].flatMap(r)
+
 
 object console:
   def putStrLn(line: => String): ZIO[Any, Nothing, Unit] = {

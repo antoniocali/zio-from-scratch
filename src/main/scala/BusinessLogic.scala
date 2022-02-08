@@ -2,47 +2,59 @@ package com.antoniocali
 
 import ourzio.*
 
-trait BusinessLogic:
-  def picOfTopic(topic: String): Boolean
 
-object BusinessLogic:
+object businessLogic:
+  trait BusinessLogic:
+    def picOfTopic(topic: String): ZIO[Any, Nothing, Boolean]
 
-  lazy val live = ZIO.fromFunction(make)
+  def picOfTopic(topic: String): ZIO[BusinessLogic, Nothing, Boolean] =
+    ZIO.accessM(_.picOfTopic(topic))
 
-  def make(google: Google): BusinessLogic =
-    new BusinessLogic {
-      override def picOfTopic(topic: String): Boolean = google.picsOf(topic) % 2 == 0
-    }
+  object BusinessLogic:
+    lazy val live: ZIO[Google, Nothing, BusinessLogic] = ZIO.fromFunction(make)
+
+    def make(google: Google): BusinessLogic =
+      new BusinessLogic {
+        override def picOfTopic(topic: String): ZIO[Any, Nothing, Boolean] = google.picsOf(topic).map(_ % 2 == 0)
+      }
 
 trait Google:
-  def picsOf(topic: String): Int
+  def picsOf(topic: String): ZIO[Any, Nothing, Int]
 
 object GoogleImpl:
   lazy val live: ZIO[Any, Nothing, Google] = ZIO.succeed(make)
 
   def make: Google = new Google {
-    override def picsOf(topic: String): Int = if (topic == "cats") 1 else 0
+    override def picsOf(topic: String): ZIO[Any, Nothing, Int] = ZIO.succeed(if (topic == "cats") 1 else 0)
   }
 
 object DependencyGraph:
   lazy val live =
     for {
       google <- GoogleImpl.live
-      bs <- BusinessLogic.live.provide(google)
+      bs <- businessLogic.BusinessLogic.live.provide(google)
     } yield bs
 
 
-  lazy val make: BusinessLogic =
+  lazy val make: businessLogic.BusinessLogic =
     val google = GoogleImpl.make
-    val businessLogic = BusinessLogic.make(google)
-    businessLogic
+    val bs = businessLogic.BusinessLogic.make(google)
+    bs
 
 object MainDep extends scala.App :
 
   val program = for {
-    dg <- DependencyGraph.live
-    _ <- console.putStrLn(dg.picOfTopic("cats").toString)
-    _ <- console.putStrLn(dg.picOfTopic("dogs").toString)
+    cats <- ZIO.access[businessLogic.BusinessLogic](bs => bs.picOfTopic("cats"))
+    _ <- console.putStrLn(cats.toString)
+    dogs <- ZIO.access[businessLogic.BusinessLogic](_.picOfTopic("dogs"))
+    _ <- console.putStrLn(dogs.toString)
   } yield ()
 
-  Runtime.default.unsafeRuntimeAsync(program)
+  val program2 = for {
+    cats <- businessLogic.picOfTopic("cats")
+    _ <- console.putStrLn(cats.toString)
+    dogs <- businessLogic.picOfTopic("dogs")
+    _ <- console.putStrLn(dogs.toString)
+  } yield ()
+
+  Runtime.default.unsafeRuntimeAsync(program2.provide(DependencyGraph.make))
