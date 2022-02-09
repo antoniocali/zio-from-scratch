@@ -44,9 +44,9 @@ object DependencyGraph:
 object MainDep extends scala.App :
 
   val program = for {
-    cats <- ZIO.access[businessLogic.BusinessLogic](bs => bs.picOfTopic("cats"))
+    cats <- ZIO.accessM[businessLogic.BusinessLogic](bs => bs.picOfTopic("cats"))
     _ <- console.putStrLn(cats.toString)
-    dogs <- ZIO.access[businessLogic.BusinessLogic](_.picOfTopic("dogs"))
+    dogs <- ZIO.accessM[businessLogic.BusinessLogic](_.picOfTopic("dogs"))
     _ <- console.putStrLn(dogs.toString)
   } yield ()
 
@@ -57,4 +57,4 @@ object MainDep extends scala.App :
     _ <- console.putStrLn(dogs.toString)
   } yield ()
 
-  Runtime.default.unsafeRuntimeAsync(program2.provide(DependencyGraph.make))
+  Runtime.default.unsafeRuntimeAsync(program.provide(DependencyGraph.make))
