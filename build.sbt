@@ -4,6 +4,5 @@ ThisBuild / scalaVersion := "3.0.1"
 
 lazy val root = (project in file("."))
   .settings(
-    name := "zio-from-scratch",
-    idePackagePrefix := Some("com.antoniocali")
+    name := "zio-from-scratch"
   )
