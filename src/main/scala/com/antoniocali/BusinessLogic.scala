@@ -60,14 +60,16 @@ object MainDep extends scala.App :
   lazy val program =
     for {
       bl <- DependencyGraph.live
-      p <- makeProgram.provide(Has(bl) ++ Has(console.Console.make))
+      p <- makeProgram.provide {
+        val result: Has[console.Console] & Has[businessLogic.BusinessLogic] = Has(bl) ++ Has(console.Console.make)
+        result
+      }
     } yield p
 
   val makeProgram = for {
     env <- ZIO.environment[Has[console.Console] & Has[businessLogic.BusinessLogic]]
     cs = env.get[console.Console]
     bl = env.get[businessLogic.BusinessLogic]
-    df = env.get[Google]
     cats <- bl.picOfTopic("cats")
     _ <- cs.putStrLn(cats.toString)
     dogs <- bl.picOfTopic("dogs")
