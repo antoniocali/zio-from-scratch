@@ -41,20 +41,37 @@ object DependencyGraph:
     val bs = businessLogic.BusinessLogic.make(google)
     bs
 
+
+trait HasConsole:
+  def console: ourzio.console.Console
+
+trait HasBusinessLogic:
+  def businessLogic: com.antoniocali.businessLogic.BusinessLogic
+
 object MainDep extends scala.App :
 
-  val program = for {
+  val makeProgram2 = for {
     cats <- ZIO.accessM[businessLogic.BusinessLogic](bs => bs.picOfTopic("cats"))
     _ <- console.putStrLn(cats.toString)
     dogs <- ZIO.accessM[businessLogic.BusinessLogic](_.picOfTopic("dogs"))
     _ <- console.putStrLn(dogs.toString)
   } yield ()
 
-  val program2 = for {
-    cats <- businessLogic.picOfTopic("cats")
-    _ <- console.putStrLn(cats.toString)
-    dogs <- businessLogic.picOfTopic("dogs")
-    _ <- console.putStrLn(dogs.toString)
+  lazy val program =
+    for {
+      bl <- DependencyGraph.live
+      p <- makeProgram.provide(Has(bl) ++ Has(console.Console.make))
+    } yield p
+
+  val makeProgram = for {
+    env <- ZIO.environment[Has[console.Console] & Has[businessLogic.BusinessLogic]]
+    cs = env.get[console.Console]
+    bl = env.get[businessLogic.BusinessLogic]
+    df = env.get[Google]
+    cats <- bl.picOfTopic("cats")
+    _ <- cs.putStrLn(cats.toString)
+    dogs <- bl.picOfTopic("dogs")
+    _ <- cs.putStrLn(dogs.toString)
   } yield ()
 
-  Runtime.default.unsafeRuntimeAsync(program.provide(DependencyGraph.make))
+  Runtime.default.unsafeRuntimeAsync(program)

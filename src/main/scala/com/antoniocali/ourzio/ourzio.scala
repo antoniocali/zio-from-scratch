@@ -1,6 +1,8 @@
 package com.antoniocali
 package ourzio
 
+import scala.reflect.ClassTag
+
 final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
 
   def flatMap[R1 <: R, E1 >: E, B](azb: A => ZIO[R1, E1, B]): ZIO[R1, E1, B] = ZIO { r =>
@@ -80,22 +82,53 @@ final case class AccessMPartiallyApplied[R]():
   def apply[E, A](r: R => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.environment[R].flatMap(r)
 
-
 object console:
-  def putStrLn(line: => String): ZIO[Any, Nothing, Unit] = {
-    ZIO.succeed {
-      println(line)
-    }
-  }
+  trait Console:
+    def putStrLn(line: => String): ZIO[Any, Nothing, Unit]
 
-  lazy val getStrLn: ZIO[Any, Nothing, String] = ZIO.succeed {
-    scala.io.StdIn.readLine()
-  }
+    def getStrLn: ZIO[Any, Nothing, String]
+
+  def putStrLn(line: => String): ZIO[Console, Nothing, Unit] =
+    ZIO.accessM[Console](_.putStrLn(line))
+
+  def getStrLn: ZIO[Console, Nothing, String] =
+    ZIO.accessM[Console](_.getStrLn)
+
+  object Console:
+    lazy val live: ZIO[Any, Nothing, Console] =
+      ZIO.succeed(make)
+
+    lazy val make: Console =
+      new Console :
+        def putStrLn(line: => String): ZIO[Any, Nothing, Unit] = {
+          ZIO.succeed {
+            println(line)
+          }
+        }
+
+        lazy val getStrLn: ZIO[Any, Nothing, String] = ZIO.succeed {
+          scala.io.StdIn.readLine()
+        }
 
 
 object Runtime:
   object default:
     def unsafeRuntimeAsync[E, A](program: ZIO[ZEnv, E, A]): Either[E, A] =
-      program.run(())
+      program.run(console.Console.make)
 
-type ZEnv = Unit
+type ZEnv = console.Console
+
+final class Has[A] private(private val map: Map[String, Any])
+
+object Has:
+  def apply[A](a: A)(using tag: ClassTag[A]): Has[A] =
+    new Has(Map(tag.toString -> a))
+
+  extension[A <: Has[?]] (a: A)
+    infix def union[B <: Has[?]](b: B): A & B =
+      new Has(a.map ++ b.map).asInstanceOf[A & B]
+
+    inline def ++[B <: Has[?]](b: B): A & B = union(b = b)
+
+    def get[S](using tag: ClassTag[S], view: A => Has[S]): S =
+      a.map(tag.toString).asInstanceOf[S]
