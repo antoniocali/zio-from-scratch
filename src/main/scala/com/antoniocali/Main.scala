@@ -10,5 +10,5 @@ object Main extends scala.App :
     _ <- console.putStrLn(s"hello $name")
   } yield ()
 
-  Runtime.default.unsafeRuntimeAsync(program.provide(console.Console.make))
+  Runtime.default.unsafeRuntimeAsync(program)
 

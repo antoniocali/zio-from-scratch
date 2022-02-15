@@ -47,6 +47,22 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
   def provide(r: => R): ZIO[Any, E, A] =
     ZIO(_ => run(r))
 
+  def provideCustom[R1: ClassTag](r1: => R1)(using view: ZEnv & Has[R1] => R): ZIO[ZEnv, E, A] =
+    provideCustomLayer(Has(r1))
+
+  // R is Has[ZEnv] && Has[BusinessLogic]
+  // R1 is Has[BusinessLogic]
+
+  def provideCustomLayer[R1 <: Has[?]](r1: => R1)(using view: ZEnv & R1 => R): ZIO[ZEnv, E, A] =
+    provideSome[ZEnv](r => r.union(r1).asInstanceOf[R])
+
+  def provideSome[R0](f: R0 => R): ZIO[R0, E, A] =
+    for {
+      r0 <- ZIO.environment[R0]
+      r = f(r0)
+      a <- provide(r)
+    } yield a
+
 
 object ZIO:
   def succeed[A](a: => A): ZIO[Any, Nothing, A] = ZIO {
@@ -83,23 +99,25 @@ final case class AccessMPartiallyApplied[R]():
     ZIO.environment[R].flatMap(r)
 
 object console:
-  trait Console:
-    def putStrLn(line: => String): ZIO[Any, Nothing, Unit]
-
-    def getStrLn: ZIO[Any, Nothing, String]
+  type Console = Has[Console.Service]
 
   def putStrLn(line: => String): ZIO[Console, Nothing, Unit] =
-    ZIO.accessM[Console](_.putStrLn(line))
+    ZIO.accessM[Console](_.get.putStrLn(line))
 
   def getStrLn: ZIO[Console, Nothing, String] =
-    ZIO.accessM[Console](_.getStrLn)
+    ZIO.accessM[Console](_.get.getStrLn)
 
   object Console:
-    lazy val live: ZIO[Any, Nothing, Console] =
+    trait Service:
+      def putStrLn(line: => String): ZIO[Any, Nothing, Unit]
+
+      def getStrLn: ZIO[Any, Nothing, String]
+
+    lazy val live: ZIO[Any, Nothing, Service] =
       ZIO.succeed(make)
 
-    lazy val make: Console =
-      new Console :
+    lazy val make: Service =
+      new Service :
         def putStrLn(line: => String): ZIO[Any, Nothing, Unit] = {
           ZIO.succeed {
             println(line)
@@ -109,14 +127,14 @@ object console:
         lazy val getStrLn: ZIO[Any, Nothing, String] = ZIO.succeed {
           scala.io.StdIn.readLine()
         }
+type ZEnv = Has[console.Console.Service]
 
 
 object Runtime:
   object default:
-    def unsafeRuntimeAsync[E, A](program: ZIO[ZEnv, E, A]): Either[E, A] =
-      program.run(console.Console.make)
+    def unsafeRuntimeAsync[E, A](zio: => ZIO[ZEnv, E, A]): Either[E, A] =
+      zio.run(Has(console.Console.make))
 
-type ZEnv = console.Console
 
 final class Has[A] private(private val map: Map[String, Any])
 
@@ -130,5 +148,6 @@ object Has:
 
     inline def ++[B <: Has[?]](b: B): A & B = union(b = b)
 
-    def get[S](using tag: ClassTag[S], view: A => Has[S]): S =
+    def get[S](using view: A => Has[S], tag: ClassTag[S]): S =
       a.map(tag.toString).asInstanceOf[S]
+
