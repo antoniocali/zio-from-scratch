@@ -6,3 +6,15 @@ lazy val root = (project in file("."))
   .settings(
     name := "zio-from-scratch"
   )
+
+ThisBuild / scalacOptions ++=
+  Seq(
+    "-deprecation",
+    "-feature",
+    "-language:implicitConversions",
+    "-unchecked",
+    "-Xfatal-warnings",
+    "-Yexplicit-nulls",
+    "-Ykind-projector",
+    "-Ysafe-init",
+  ) ++ Seq("-rewrite", "-indent") ++ Seq("-source", "future")

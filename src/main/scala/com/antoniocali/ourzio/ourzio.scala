@@ -7,10 +7,9 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
 
   def flatMap[R1 <: R, E1 >: E, B](azb: A => ZIO[R1, E1, B]): ZIO[R1, E1, B] = ZIO { r =>
     val errorOrA = run(r)
-    val zErrorOrB = errorOrA match {
+    val zErrorOrB = errorOrA match
       case Left(e) => ZIO.fail(e)
       case Right(a) => azb(a)
-    }
     val errorOrB = zErrorOrB.run(r)
     errorOrB
   }
@@ -26,19 +25,17 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
   def map[B](ab: A => B): ZIO[R, E, B] = ZIO {
     r =>
       val errorOrA = run(r)
-      errorOrA match {
+      errorOrA match
         case Left(e) => Left(e)
         case Right(a) => Right(ab(a))
-      }
   }
 
   def catchAll[R1 <: R, F >: E, A1 >: A](h: E => ZIO[R1, F, A1]): ZIO[R1, F, A1] = ZIO {
     (r) =>
       val errorOrA = run(r)
-      val zErrorFOrA = errorOrA match {
+      val zErrorFOrA = errorOrA match
         case Left(e) => h(e)
         case Right(a) => ZIO.succeed(a)
-      }
       val errorFOrA = zErrorFOrA.run(r)
       errorFOrA
   }
@@ -46,10 +43,9 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
   def mapError[F](h: E => F): ZIO[R, F, A] = ZIO {
     (r) =>
       val errorForA = run(r)
-      errorForA match {
+      errorForA match
         case Left(e) => Left(h(e))
         case Right(a) => Right(a)
-      }
   }
 
   def provide(r: => R): ZIO[Any, E, A] =
@@ -126,11 +122,10 @@ object console:
 
     lazy val make: Service =
       new Service :
-        def putStrLn(line: => String): ZIO[Any, Nothing, Unit] = {
+        def putStrLn(line: => String): ZIO[Any, Nothing, Unit] =
           ZIO.succeed {
             println(line)
           }
-        }
 
         lazy val getStrLn: ZIO[Any, Nothing, String] = ZIO.succeed {
           scala.io.StdIn.readLine()
