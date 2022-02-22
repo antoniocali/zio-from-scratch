@@ -15,6 +15,14 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
     errorOrB
   }
 
+  def zip[R1 <: R, E1 >: E, B](that: ZIO[R1, E1, B]): ZIO[R1, E1, (A, B)] =
+    val result: ZIO[R1, E1, (A, B)] = for {
+      a <- this
+      b <- that
+    } yield a -> b
+    result
+
+
   def map[B](ab: A => B): ZIO[R, E, B] = ZIO {
     r =>
       val errorOrA = run(r)
@@ -113,8 +121,8 @@ object console:
 
       def getStrLn: ZIO[Any, Nothing, String]
 
-    lazy val live: ZIO[Any, Nothing, Service] =
-      ZIO.succeed(make)
+    lazy val live: ZIO[Any, Nothing, Console] =
+      ZIO.succeed(Has(make))
 
     lazy val make: Service =
       new Service :
@@ -127,6 +135,7 @@ object console:
         lazy val getStrLn: ZIO[Any, Nothing, String] = ZIO.succeed {
           scala.io.StdIn.readLine()
         }
+
 type ZEnv = Has[console.Console.Service]
 
 
