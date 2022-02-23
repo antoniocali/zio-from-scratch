@@ -12,10 +12,7 @@ object businessLogic:
     trait Service:
       def picOfTopic(topic: String): ZIO[Any, Nothing, Boolean]
 
-    lazy val live: ZIO[google.Google, Nothing, BusinessLogic] = ZIO.fromFunction { env =>
-      val g = env.get[google.Google.Service]
-      Has(make(g))
-    }
+    lazy val live: ZLayer[google.Google, Nothing, BusinessLogic] = ZLayer.fromService(make)
 
     def make(g: google.Google.Service): Service =
       new Service {
@@ -33,10 +30,10 @@ object google:
     ZIO.accessM(_.get.picsOf(topic))
 
 object GoogleImpl:
-  lazy val live: ZIO[Any, Nothing, google.Google] = ZLayer.succeed(make)
+  lazy val live: ZLayer[Any, Nothing, google.Google] = ZLayer.succeed(make)
 
   def make: google.Google.Service =
-    new:
+    new :
       override def picsOf(topic: String): ZIO[Any, Nothing, Int] = ZIO.succeed(if (topic == "cats") 1 else 0)
 
 object controller:
@@ -46,12 +43,8 @@ object controller:
     trait Service:
       def run: ZIO[Any, Nothing, Unit]
 
-    lazy val live: ZIO[businessLogic.BusinessLogic & console.Console, Nothing, Service] = ZIO.fromFunction {
-      env =>
-        val bl = env.get[businessLogic.BusinessLogic.Service]
-        val c = env.get[console.Console.Service]
-        make(bl, c)
-    }
+    lazy val live: ZLayer[businessLogic.BusinessLogic & console.Console, Nothing, Controller] =
+      ZLayer.fromServices(make)
 
     def make(bl: businessLogic.BusinessLogic.Service, con: console.Console.Service): Service =
       new Service {
@@ -67,7 +60,7 @@ object controller:
     ZIO.accessM[Controller](_.get.run)
 
 object DependencyGraph:
-  lazy val live: ZIO[Any, Nothing, controller.Controller.Service] =
+  lazy val live: ZLayer[Any, Nothing, controller.Controller] =
     for
       (google, con) <- GoogleImpl.live.zip(console.Console.live)
       bs <- businessLogic.BusinessLogic.live.provide(google)
@@ -86,5 +79,5 @@ object MainDep extends scala.App :
   lazy val program =
   //    DependencyGraph.live.flatMap(_.get.run)
   //    DependencyGraph.live.flatMap(r => controller.run.provide(Has(r)))
-    controller.run.provide(Has(DependencyGraph.make))
+    controller.run.provideLayer(DependencyGraph.live)
   Runtime.default.unsafeRuntimeAsync(program)

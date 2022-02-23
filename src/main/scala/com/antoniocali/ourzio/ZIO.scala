@@ -51,6 +51,9 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
   def provide(r: => R): ZIO[Any, E, A] =
     ZIO(_ => run(r))
 
+  def provideLayer[R1, E1 >: E](layer: ZLayer[R1, E1, R]): ZIO[R1, E1, A] =
+    layer.zio.flatMap(r => provide(r))
+
   def provideCustom[R1: ClassTag](r1: => R1)(using view: ZEnv & Has[R1] => R): ZIO[ZEnv, E, A] =
     provideCustomLayer(Has(r1))
 

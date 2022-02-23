@@ -15,7 +15,7 @@ object console:
 
       def getStrLn: ZIO[Any, Nothing, String]
 
-    lazy val live: ZIO[Any, Nothing, Console] =
+    lazy val live: ZLayer[Any, Nothing, Console] =
       ZLayer.succeed(make)
 
     lazy val make: Service =

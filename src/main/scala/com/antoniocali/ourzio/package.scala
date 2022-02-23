@@ -9,5 +9,8 @@ package object ourzio:
     def apply[E, A](r: R => ZIO[R, E, A]): ZIO[R, E, A] =
       ZIO.environment[R].flatMap(r)
 
-  type ZEnv = Has[console.Console.Service]
+  type ZEnv = console.Console
+  object ZEnv:
+    lazy val live: ZLayer[Any, Nothing, ZEnv] =
+      console.Console.live
 
