@@ -33,7 +33,7 @@ object google:
     ZIO.accessM(_.get.picsOf(topic))
 
 object GoogleImpl:
-  lazy val live: ZIO[Any, Nothing, google.Google] = ZIO.succeed(Has(make))
+  lazy val live: ZIO[Any, Nothing, google.Google] = ZLayer.succeed(make)
 
   def make: google.Google.Service =
     new:
