@@ -19,6 +19,15 @@ final class ZLayer[-R, +E, +A](val zio: ZIO[R, E, A]):
   inline def provide(r: => R): ZLayer[Any, E, A] =
     ZLayer(this.zio.provide(r))
 
+  def >>>[E1 >: E, B <: Has[?]](that: ZLayer[A, E1, B])(using view: A => Has[?]): ZLayer[R, E1, B] =
+    for {
+      a <- this
+      b <- that.provide(a)
+    } yield b
+
+  def ++[R1 <: Has[?], E1 >: E, B <: Has[?]](that: ZLayer[R1, E1, B])(using view: A => Has[?]): ZLayer[R & R1, E1, A & B] =
+    this.zip(that).map((a, b) => view(a).union(b).asInstanceOf[A & B])
+
 
 object ZLayer:
   def succeed[A: ClassTag](a: A): ZLayer[Any, Nothing, Has[A]] =
@@ -38,3 +47,9 @@ object ZLayer:
       val a = f(s1, s2)
       Has(a)
     })
+
+  inline def requires[R]: ZLayer[R, Nothing, R] = identity[R]
+
+  def identity[R]: ZLayer[R, Nothing, R] =
+    ZLayer(ZIO.identity[R])
+

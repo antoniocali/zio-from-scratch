@@ -51,17 +51,12 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
   def provide(r: => R): ZIO[Any, E, A] =
     ZIO(_ => run(r))
 
-  def provideLayer[R1, E1 >: E](layer: ZLayer[R1, E1, R]): ZIO[R1, E1, A] =
-    layer.zio.flatMap(r => provide(r))
+  def provideLayer[R1, E1 >: E, B](layer: ZLayer[R1, E1, B])(using view: B => R): ZIO[R1, E1, A] =
+    layer.zio.map(view).flatMap(r => provide(r))
 
-  def provideCustom[R1: ClassTag](r1: => R1)(using view: ZEnv & Has[R1] => R): ZIO[ZEnv, E, A] =
-    provideCustomLayer(Has(r1))
 
-  // R is Has[ZEnv] && Has[BusinessLogic]
-  // R1 is Has[BusinessLogic]
-
-  def provideCustomLayer[R1 <: Has[?]](r1: => R1)(using view: ZEnv & R1 => R): ZIO[ZEnv, E, A] =
-    provideSome[ZEnv](r => r.union(r1).asInstanceOf[R])
+  def provideCustomLayer[E1 >: E, B <: Has[?]](layer: ZLayer[ZEnv, E1, B])(using view: B => R): ZIO[ZEnv, E1, A] =
+    provideSomeLayer(layer)
 
   def provideSome[R0](f: R0 => R): ZIO[R0, E, A] =
     for {
@@ -70,6 +65,8 @@ final class ZIO[-R, +E, +A](val run: R => Either[E, A]):
       a <- provide(r)
     } yield a
 
+  def provideSomeLayer[R0 <: Has[?], E1 >: E, B <: Has[?]](layer: ZLayer[R0, E1, B])(using view: B => R): ZIO[R0, E1, A] =
+    provideLayer(ZLayer.identity[R0] ++ layer)
 
 object ZIO:
   def succeed[A](a: => A): ZIO[Any, Nothing, A] = ZIO {

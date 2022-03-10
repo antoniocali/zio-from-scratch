@@ -10,7 +10,11 @@ package object ourzio:
       ZIO.environment[R].flatMap(r)
 
   type ZEnv = console.Console
+
   object ZEnv:
     lazy val live: ZLayer[Any, Nothing, ZEnv] =
       console.Console.live
+
+    lazy val any: ZLayer[ZEnv, Nothing, ZEnv] =
+      ZLayer.requires
 
